@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Lock In</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap');
+
+:root {
+  --cream: #F7F0E6;
+  --warm: #2A1A0E;
+  --amber: #C4782A;
+  --amber-soft: #E8C48A;
+  --amber-pale: #FAF3E6;
+  --magenta: #8B3A6B;
+  --magenta-soft: #D4A0BF;
+  --magenta-pale: #F7EDF4;
+  --stone: #9A8878;
+  --stone-light: #D9CFC7;
+  --teal: #3A7D6E;
+  --teal-pale: #D4EDE8;
+  --glow-amber: rgba(196,120,42,0.15);
+  --glow-magenta: rgba(139,58,107,0.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  height: 100%; width: 100%;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--warm);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ambient glow bg */
+#glow-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 30% 20%, var(--glow-amber), transparent),
+    radial-gradient(ellipse 50% 40% at 75% 75%, var(--glow-magenta), transparent);
+  transition: opacity 2s ease;
+}
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 36px 60px;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(30px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.screen.active {
+  opacity: 1;
+  pointer-events: all;
+  transform: translateY(0);
+}
+
+.screen.exit {
+  opacity: 0;
+  transform: translateY(-20px);
+  pointer-events: none;
+}
+
+/* typography */
+.serif { font-family: 'Cormorant Garamond', serif; }
+
+.headline {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 300;
+  font-size: 52px;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--warm);
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+
+.headline em {
+  font-style: italic;
+  color: var(--magenta);
+}
+
+.headline .amber { color: var(--amber); }
+
+.subhead {
+  font-size: 15px;
+  color: var(--stone);
+  text-align: center;
+  line-height: 1.7;
+  font-weight: 300;
+  max-width: 340px;
+  margin-bottom: 36px;
+}
+
+/* progress dots */
+.dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 32px;
+  position: absolute;
+  top: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--stone-light);
+  transition: all 0.4s ease;
+}
+.dot.on { background: var(--amber); width: 16px; border-radius: 3px; }
+.dot.done { background: var(--magenta-soft); }
+
+/* mood grid */
+.mood-wrap {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 20px;
+}
+
+.mood-btn {
+  padding: 18px 8px 14px;
+  border-radius: 18px;
+  border: 1px solid var(--stone-light);
+  background: white;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.25s;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.mood-btn:active, .mood-btn.sel {
+  border-color: var(--magenta);
+  background: var(--magenta-pale);
+  transform: scale(0.97);
+}
+
+.mood-em { font-size: 26px; line-height: 1; }
+.mood-lbl { font-size: 11px; color: var(--stone); font-weight: 500; letter-spacing: 0.02em; }
+
+/* mood response line */
+#mood-reply {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 19px;
+  color: var(--magenta);
+  text-align: center;
+  min-height: 28px;
+  margin-bottom: 20px;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+#mood-reply.show { opacity: 1; }
+
+/* breathing */
+#breath-orb {
+  width: 160px; height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%,
+    rgba(232,196,138,0.6),
+    rgba(212,160,191,0.4),
+    rgba(196,120,42,0.15));
+  border: 1px solid rgba(196,120,42,0.25);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 28px;
+  transition: transform 4s cubic-bezier(0.45, 0.05, 0.55, 0.95),
+              box-shadow 4s ease;
+  box-shadow: 0 0 0 0 rgba(196,120,42,0);
+}
+
+#breath-orb.expand {
+  transform: scale(1.55);
+  box-shadow: 0 0 60px 10px rgba(212,160,191,0.2);
+}
+
+#breath-word {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--amber);
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
+#breath-instr {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--warm);
+  margin-bottom: 6px;
+  min-height: 26px;
+  text-align: center;
+  transition: opacity 0.4s;
+}
+
+#breath-count {
+  font-size: 13px;
+  color: var(--stone);
+  margin-bottom: 32px;
+  text-align: center;
+  font-weight: 300;
+}
+
+/* compassion text */
+#compassion-line {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 16px;
+  color: var(--stone);
+  text-align: center;
+  max-width: 300px;
+  line-height: 1.6;
+  margin-bottom: 28px;
+  min-height: 48px;
+  transition: opacity 0.6s;
+}
+
+/* task entry */
+.task-section {
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 16px;
+}
+
+.task-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin-bottom: 8px;
+}
+
+.task-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--stone-light);
+  background: white;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  color: var(--warm);
+  outline: none;
+  transition: border-color 0.2s;
+  resize: none;
+}
+.task-input:focus { border-color: var(--amber); }
+.task-input::placeholder { color: var(--stone-light); }
+
+.micro-box {
+  width: 100%;
+  max-width: 400px;
+  background: var(--amber-pale);
+  border: 1px solid rgba(196,120,42,0.25);
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-bottom: 20px;
+}
+
+.micro-label {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 6px;
+}
+
+.micro-step {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  color: var(--warm);
+  line-height: 1.4;
+}
+
+/* no-prep path */
+.path-card {
+  width: 100%;
+  max-width: 360px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid var(--stone-light);
+  background: white;
+  margin-bottom: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  transition: all 0.2s;
+}
+.path-card:hover { border-color: var(--amber); background: var(--amber-pale); }
+.path-icon { font-size: 22px; flex-shrink: 0; }
+.path-text-wrap {}
+.path-title { font-size: 14px; font-weight: 500; color: var(--warm); }
+.path-sub { font-size: 12px; color: var(--stone); margin-top: 2px; line-height: 1.4; }
+
+/* work screen */
+#work-task-display {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-style: italic;
+  text-align: center;
+  color: var(--warm);
+  max-width: 340px;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+#work-micro-display {
+  font-size: 13px;
+  color: var(--stone);
+  text-align: center;
+  max-width: 320px;
+  line-height: 1.6;
+  margin-bottom: 32px;
+  font-weight: 300;
+}
+
+#big-timer {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 72px;
+  font-weight: 300;
+  color: var(--warm);
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+#timer-phase {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin-bottom: 36px;
+}
+
+/* timer arc */
+#arc-wrap {
+  position: relative;
+  width: 200px; height: 200px;
+  margin-bottom: 28px;
+}
+
+#arc-wrap svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+#arc-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* buttons */
+.btn-primary {
+  padding: 15px 44px;
+  border-radius: 50px;
+  border: none;
+  background: var(--warm);
+  color: var(--cream);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.01em;
+}
+.btn-primary:hover { background: var(--amber); transform: translateY(-1px); }
+.btn-primary:disabled { background: var(--stone-light); cursor: not-allowed; transform: none; }
+
+.btn-ghost {
+  padding: 10px 28px;
+  border-radius: 50px;
+  border: 1.5px solid var(--stone-light);
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: var(--stone);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 10px;
+}
+.btn-ghost:hover { border-color: var(--amber); color: var(--amber); }
+
+.btn-sm {
+  padding: 8px 20px;
+  border-radius: 50px;
+  border: 1px solid var(--stone-light);
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--stone);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-sm:hover { border-color: var(--magenta); color: var(--magenta); }
+
+.btn-done {
+  padding: 14px 36px;
+  border-radius: 50px;
+  border: none;
+  background: var(--teal);
+  color: white;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-done:hover { background: #2d6557; transform: translateY(-1px); }
+
+/* launch buttons */
+.launch-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 380px;
+  margin-bottom: 12px;
+}
+
+.launch-card {
+  flex: 1;
+  padding: 16px 10px;
+  border-radius: 16px;
+  border: 1px solid var(--stone-light);
+  background: white;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  text-decoration: none;
+  font-family: 'DM Sans', sans-serif;
+}
+.launch-card:hover { border-color: var(--amber); background: var(--amber-pale); transform: translateY(-2px); }
+.launch-em { font-size: 24px; }
+.launch-name { font-size: 12px; font-weight: 500; color: var(--warm); }
+.launch-desc { font-size: 10px; color: var(--stone); text-align: center; }
+
+/* confetti canvas */
+#confetti { position: fixed; inset: 0; pointer-events: none; z-index: 999; }
+
+/* completion overlay */
+#complete-overlay {
+  position: fixed; inset: 0;
+  background: rgba(42,26,14,0.5);
+  display: none; align-items: center; justify-content: center;
+  z-index: 998;
+}
+#complete-overlay.show { display: flex; }
+
+#complete-card {
+  background: var(--cream);
+  border-radius: 24px;
+  padding: 36px 40px;
+  text-align: center;
+  max-width: 320px;
+  width: 90%;
+  animation: popIn 0.3s ease;
+}
+
+@keyframes popIn {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.complete-em { font-size: 48px; margin-bottom: 12px; }
+.complete-title { font-family: 'Cormorant Garamond', serif; font-size: 28px; margin-bottom: 8px; }
+.complete-sub { font-size: 14px; color: var(--stone); line-height: 1.6; margin-bottom: 24px; font-weight: 300; }
+
+/* floating task pill (work screen) */
+#task-pill {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  border: 1px solid var(--stone-light);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 12px;
+  color: var(--warm);
+  font-weight: 500;
+  z-index: 10;
+  display: none;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+/* session saved notice */
+.saved-badge {
+  font-size: 11px;
+  color: var(--teal);
+  text-align: center;
+  margin-top: 8px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.saved-badge.show { opacity: 1; }
+
+/* clock top right */
+#clock {
+  position: fixed;
+  top: 20px; right: 24px;
+  font-size: 13px;
+  color: var(--stone);
+  font-weight: 300;
+  z-index: 10;
+  letter-spacing: 0.02em;
+}
+</style>
+</head>
+<body>
+
+<canvas id="confetti"></canvas>
+<div id="clock"></div>
+
+<div id="complete-overlay">
+  <div id="complete-card">
+    <div class="complete-em" id="c-em">✓</div>
+    <div class="complete-title" id="c-title">Done.</div>
+    <div class="complete-sub" id="c-sub">Keep going.</div>
+    <button class="btn-primary" onclick="closeComplete()" style="width:100%">Next step</button>
+  </div>
+</div>
+
+<div id="task-pill" id="task-pill"></div>
+<div id="glow-bg"></div>
+
+<div id="app">
+
+  <!-- SCREEN 0: ARRIVAL -->
+  <div class="screen active" id="s0">
+    <div class="dots">
+      <div class="dot on" id="d0"></div>
+      <div class="dot" id="d1"></div>
+      <div class="dot" id="d2"></div>
+      <div class="dot" id="d3"></div>
+      <div class="dot" id="d4"></div>
+    </div>
+    <div class="headline" id="greeting">Hi, <em>Kankan.</em></div>
+    <div class="subhead">Before anything else — just check in. How are you right now?</div>
+    <div class="mood-wrap">
+      <button class="mood-btn" onclick="mood(this,'🔥','Fired up. Good. Let that energy lead.')"><div class="mood-em">🔥</div><div class="mood-lbl">Fired up</div></button>
+      <button class="mood-btn" onclick="mood(this,'😤','Focused and a little tense. That works.')"><div class="mood-em">😤</div><div class="mood-lbl">Focused</div></button>
+      <button class="mood-btn" onclick="mood(this,'😌','Calm is a good place to work from.')"><div class="mood-em">😌</div><div class="mood-lbl">Calm</div></button>
+      <button class="mood-btn" onclick="mood(this,'😴','Tired. Start anyway — momentum follows.')"><div class="mood-em">😴</div><div class="mood-lbl">Tired</div></button>
+      <button class="mood-btn" onclick="mood(this,'😬','Anxious. The work will help more than the scroll did.')"><div class="mood-em">😬</div><div class="mood-lbl">Anxious</div></button>
+      <button class="mood-btn" onclick="mood(this,'😶','Blank is okay. You showed up. That counts.')"><div class="mood-em">😶</div><div class="mood-lbl">Blank</div></button>
+    </div>
+    <div id="mood-reply"></div>
+    <button class="btn-primary" id="mood-next" onclick="go(1)" disabled>I'm here</button>
+  </div>
+
+  <!-- SCREEN 1: BREATHE -->
+  <div class="screen" id="s1">
+    <div class="dots">
+      <div class="dot done"></div>
+      <div class="dot on"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+    <div class="headline" style="font-size:36px;margin-bottom:8px">Two and a half<br><em>minutes.</em></div>
+    <div class="subhead" style="margin-bottom:24px">Your nervous system needs this.<br>Don't skip it.</div>
+    <div id="breath-orb"><div id="breath-word">breathe</div></div>
+    <div id="breath-instr">Get comfortable</div>
+    <div id="breath-count">Starting in a moment…</div>
+    <div id="compassion-line"></div>
+    <button class="btn-primary" id="breath-next" onclick="go(2)" disabled>I'm grounded</button>
+  </div>
+
+  <!-- SCREEN 2: TASK CHECK -->
+  <div class="screen" id="s2">
+    <div class="dots">
+      <div class="dot done"></div>
+      <div class="dot done"></div>
+      <div class="dot on"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+    </div>
+    <div class="headline" style="font-size:34px;margin-bottom:10px">Did you set your<br><em>task last night?</em></div>
+    <div class="subhead" style="margin-bottom:24px">No judgment either way — just tell me where we're starting from.</div>
+    <div style="width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px">
+      <div class="path-card" onclick="go(3)">
+        <div class="path-icon">✅</div>
+        <div class="path-text-wrap">
+          <div class="path-title">Yes — I know what I'm doing today</div>
+          <div class="path-sub">Let's confirm it and break it down</div>
+        </div>
+      </div>
+      <div class="path-card" onclick="go(3, true)">
+        <div class="path-icon">🌫️</div>
+        <div class="path-text-wrap">
+          <div class="path-title">No — I didn't prep last night</div>
+          <div class="path-sub">That's okay. We'll figure it out right now in 60 seconds</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: TASK INPUT -->
+  <div class="screen" id="s3">
+    <div class="dots">
+      <div class="dot done"></div>
+      <div class="dot done"></div>
+      <div class="dot done"></div>
+      <div class="dot on"></div>
+      <div class="dot"></div>
+    </div>
+    <div class="headline" style="font-size:32px;margin-bottom:8px" id="task-screen-title">What's the <em>one thing</em><br>that matters most?</div>
+    <div class="subhead" id="task-screen-sub" style="margin-bottom:20px">Not your whole list. Just the thing with the earliest deadline or highest stakes.</div>
+    <div class="task-section">
+      <div class="task-label">The task</div>
+      <input class="task-input" id="task-main" type="text" placeholder="e.g. Write intro paragraph for lit review" maxlength="100">
+    </div>
+    <div class="task-section" style="margin-bottom:8px">
+      <div class="task-label">First micro-step <span style="font-weight:300;text-transform:none;letter-spacing:0">(the smallest possible start)</span></div>
+      <input class="task-input" id="task-micro" type="text" placeholder="e.g. Open doc and write one sentence" maxlength="100">
+    </div>
+    <div id="micro-hint" style="font-size:12px;color:var(--stone);margin-bottom:20px;max-width:400px;text-align:center;font-weight:300;line-height:1.5"></div>
+    <button class="btn-primary" onclick="confirmTask()">Lock it in</button>
+    <div class="saved-badge" id="saved-badge">Saved ✓</div>
+  </div>
+
+  <!-- SCREEN 4: LAUNCH -->
+  <div class="screen" id="s4">
+    <div class="dots">
+      <div class="dot done"></div>
+      <div class="dot done"></div>
+      <div class="dot done"></div>
+      <div class="dot done"></div>
+      <div class="dot on"></div>
+    </div>
+    <div class="headline" style="font-size:34px;margin-bottom:8px">Your only job<br>right now is <span class="amber">this.</span></div>
+    <div id="launch-task" style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:20px;color:var(--stone);text-align:center;max-width:340px;margin-bottom:6px;line-height:1.5"></div>
+    <div id="launch-micro" style="font-size:13px;color:var(--amber);text-align:center;max-width:320px;margin-bottom:28px;font-weight:500"></div>
+
+    <button class="btn-primary" onclick="startWork()" style="margin-bottom:16px;width:100%;max-width:360px">Start 2-minute timer — just begin</button>
+
+    <div class="launch-row">
+      <a class="launch-card" href="https://www.flown.com" target="_blank">
+        <div class="launch-em">🌊</div>
+        <div class="launch-name">FLOWN</div>
+        <div class="launch-desc">Group session</div>
+      </a>
+      <a class="launch-card" href="https://www.focusmate.com" target="_blank">
+        <div class="launch-em">👥</div>
+        <div class="launch-name">Focusmate</div>
+        <div class="launch-desc">1:1 partner</div>
+      </a>
+      <a class="launch-card" href="https://open.spotify.com/search/lo-fi%20study" target="_blank">
+        <div class="launch-em">🎵</div>
+        <div class="launch-name">Music</div>
+        <div class="launch-desc">Lo-fi focus</div>
+      </a>
+    </div>
+    <button class="btn-ghost" onclick="startWork()">Just work alone</button>
+  </div>
+
+  <!-- SCREEN 5: WORK -->
+  <div class="screen" id="s5">
+    <div id="arc-wrap">
+      <svg viewBox="0 0 200 200" width="200" height="200">
+        <circle cx="100" cy="100" r="88" fill="none" stroke="var(--stone-light)" stroke-width="3"/>
+        <circle cx="100" cy="100" r="88" fill="none"
+          stroke="var(--amber)" stroke-width="3"
+          stroke-dasharray="553" stroke-dashoffset="553"
+          stroke-linecap="round"
+          id="arc-fill" style="transition:stroke-dashoffset 1s linear"/>
+      </svg>
+      <div id="arc-center">
+        <div id="big-timer">2:00</div>
+        <div id="timer-phase">just begin</div>
+      </div>
+    </div>
+    <div id="work-task-display"></div>
+    <div id="work-micro-display"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+      <button class="btn-done" onclick="taskDone()">✓ Done — next step</button>
+      <button class="btn-sm" onclick="extendTimer()">+5 min</button>
+      <button class="btn-sm" id="pause-btn" onclick="togglePause()">Pause</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SAVE_KEY = 'kankan_v3';
+let state = {
+  screen: 0,
+  mood: null,
+  task: '',
+  micro: '',
+  noPrep: false,
+  timerSec: 0,
+  timerTotal: 0,
+  timerRunning: false,
+  paused: false,
+  breathDone: false
+};
+
+let timerInterval = null;
+let breathTimeout = null;
+let savedTask = null;
+
+// ── INIT ──
+function init() {
+  updateClock();
+  setInterval(updateClock, 20000);
+  greetTime();
+  loadSaved();
+}
+
+function updateClock() {
+  const now = new Date();
+  const h = now.getHours() % 12 || 12;
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const ap = now.getHours() >= 12 ? 'pm' : 'am';
+  document.getElementById('clock').textContent = h + ':' + m + ' ' + ap;
+}
+
+function greetTime() {
+  const h = new Date().getHours();
+  const g = h < 12 ? 'Good morning,' : h < 17 ? 'Good afternoon,' : 'Good evening,';
+  document.getElementById('greeting').innerHTML = g + '<br><em>Kankan.</em>';
+}
+
+function loadSaved() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const d = JSON.parse(raw);
+      const today = new Date().toDateString();
+      if (d.date === today && d.task) {
+        savedTask = { task: d.task, micro: d.micro };
+      }
+    }
+  } catch(e) {}
+}
+
+function saveTask(task, micro) {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      date: new Date().toDateString(), task, micro
+    }));
+  } catch(e) {}
+}
+
+// ── SCREEN NAV ──
+function go(n, noPrep) {
+  const cur = document.getElementById('s' + state.screen);
+  cur.classList.remove('active');
+  cur.classList.add('exit');
+  setTimeout(() => cur.classList.remove('exit'), 700);
+
+  state.screen = n;
+  if (noPrep !== undefined) state.noPrep = noPrep;
+
+  const next = document.getElementById('s' + n);
+  next.classList.add('active');
+
+  if (n === 1) startBreath();
+  if (n === 3) setupTaskScreen();
+  if (n === 4) setupLaunch();
+  if (n === 5) setupWork();
+}
+
+// ── MOOD ──
+function mood(btn, emoji, reply) {
+  document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  state.mood = emoji;
+  const el = document.getElementById('mood-reply');
+  el.textContent = reply;
+  el.classList.add('show');
+  document.getElementById('mood-next').disabled = false;
+}
+
+// ── BREATHING ──
+const compassionLines = [
+  "You're not lazy. Your brain is wired differently.",
+  "Whatever happened before this moment doesn't define this one.",
+  "Starting is the hardest part. You're already here.",
+  "You don't have to feel ready. You just have to begin.",
+  "One breath at a time. One task at a time.",
+  "You showed up. That's already something.",
+  "The scroll wasn't you being bad. It was you needing rest.",
+  "Progress doesn't have to be perfect to count."
+];
+
+function startBreath() {
+  let phase = 0;
+  let breathsDone = 0;
+  const total = 8; // ~2.5 min at 4+2+4+1 = 11s per breath × 8 ≈ 88s, pad with slower phases
+  const phases = [
+    { label: 'Inhale slowly', word: 'inhale', dur: 5000, expand: true },
+    { label: 'Hold', word: 'hold', dur: 3000, expand: true },
+    { label: 'Exhale slowly', word: 'exhale', dur: 6000, expand: false },
+    { label: '', word: 'rest', dur: 2000, expand: false },
+  ];
+
+  const orb = document.getElementById('breath-orb');
+  const word = document.getElementById('breath-word');
+  const instr = document.getElementById('breath-instr');
+  const count = document.getElementById('breath-count');
+  const comp = document.getElementById('compassion-line');
+
+  let compIdx = 0;
+  function showComp() {
+    comp.style.opacity = 0;
+    setTimeout(() => {
+      comp.textContent = compassionLines[compIdx % compassionLines.length];
+      comp.style.opacity = 1;
+      compIdx++;
+    }, 400);
+  }
+  showComp();
+
+  function runPhase() {
+    const p = phases[phase];
+    word.textContent = p.word;
+    instr.textContent = p.label;
+    if (p.expand) orb.classList.add('expand');
+    else orb.classList.remove('expand');
+
+    if (phase === 3) {
+      breathsDone++;
+      const left = total - breathsDone;
+      if (left > 0) {
+        count.textContent = left + ' breath' + (left !== 1 ? 's' : '') + ' remaining';
+        if (breathsDone % 2 === 0) showComp();
+      } else {
+        count.textContent = 'Beautiful. ✓';
+        instr.textContent = 'Take a moment.';
+        document.getElementById('breath-next').disabled = false;
+        return;
+      }
+    }
+
+    phase = (phase + 1) % 4;
+    breathTimeout = setTimeout(runPhase, p.dur);
+  }
+
+  setTimeout(runPhase, 1200);
+}
+
+// ── TASK SCREEN ──
+function setupTaskScreen() {
+  if (state.noPrep) {
+    document.getElementById('task-screen-title').innerHTML = 'No prep — that\'s okay.<br><em>Let\'s find your task.</em>';
+    document.getElementById('task-screen-sub').textContent = 'What has the earliest deadline or the most weight on your mind right now? One thing only.';
+    document.getElementById('micro-hint').textContent = 'Now: what\'s the smallest possible first action? Not the whole task — just the door handle.';
+  } else if (savedTask) {
+    document.getElementById('task-main').value = savedTask.task;
+    document.getElementById('task-micro').value = savedTask.micro;
+    document.getElementById('task-screen-title').innerHTML = 'Here\'s what you<br><em>set last night.</em>';
+    document.getElementById('task-screen-sub').textContent = 'Confirm it or adjust. Then we break it down to the first step.';
+    document.getElementById('micro-hint').textContent = 'Is this still the right first step? Make it smaller if it still feels heavy.';
+  } else {
+    document.getElementById('micro-hint').textContent = 'Make the micro-step so small it feels almost silly. "Open the doc" counts. That\'s the whole point.';
+  }
+
+  // auto-generate micro if main is filled and micro is empty
+  document.getElementById('task-main').addEventListener('input', function() {
+    const micro = document.getElementById('task-micro');
+    if (!micro.value) {
+      const task = this.value.toLowerCase();
+      let suggestion = 'Open the document and write the first sentence';
+      if (task.includes('email') || task.includes('message')) suggestion = 'Open the email and type "Hi" — just start it';
+      else if (task.includes('read') || task.includes('chapter') || task.includes('article')) suggestion = 'Open to page 1 and read the first paragraph only';
+      else if (task.includes('math') || task.includes('problem') || task.includes('calc')) suggestion = 'Write out the first problem and read what it\'s asking';
+      else if (task.includes('essay') || task.includes('paragraph') || task.includes('write')) suggestion = 'Open the doc, write your name and the date';
+      else if (task.includes('research') || task.includes('lit review') || task.includes('source')) suggestion = 'Open one tab and search the main keyword';
+      else if (task.includes('code') || task.includes('build') || task.includes('project')) suggestion = 'Open the file and read the last 10 lines you wrote';
+      else if (task.includes('study') || task.includes('review') || task.includes('flash')) suggestion = 'Open your notes and read the first section heading only';
+      micro.placeholder = suggestion;
+    }
+  });
+}
+
+function confirmTask() {
+  const task = document.getElementById('task-main').value.trim();
+  const micro = document.getElementById('task-micro').value.trim() ||
+    document.getElementById('task-micro').placeholder;
+  if (!task) { document.getElementById('task-main').focus(); return; }
+  state.task = task;
+  state.micro = micro || 'Open it and write one sentence';
+  saveTask(state.task, state.micro);
+  const badge = document.getElementById('saved-badge');
+  badge.classList.add('show');
+  setTimeout(() => { badge.classList.remove('show'); go(4); }, 800);
+}
+
+// ── LAUNCH ──
+function setupLaunch() {
+  document.getElementById('launch-task').textContent = '"' + state.task + '"';
+  document.getElementById('launch-micro').textContent = 'First step → ' + state.micro;
+}
+
+// ── WORK ──
+function startWork() {
+  go(5);
+}
+
+function setupWork() {
+  document.getElementById('work-task-display').textContent = '"' + state.task + '"';
+  document.getElementById('work-micro-display').textContent = 'Right now: ' + state.micro;
+  document.getElementById('task-pill').textContent = state.micro;
+  document.getElementById('task-pill').style.display = 'block';
+  startTimer(2 * 60);
+}
+
+// ── TIMER ──
+function startTimer(seconds) {
+  if (timerInterval) clearInterval(timerInterval);
+  state.timerSec = seconds;
+  state.timerTotal = seconds;
+  state.paused = false;
+  state.timerRunning = true;
+  document.getElementById('pause-btn').textContent = 'Pause';
+  updateTimerDisplay();
+  timerInterval = setInterval(tick, 1000);
+}
+
+function tick() {
+  if (state.paused) return;
+  state.timerSec--;
+  if (state.timerSec <= 0) {
+    clearInterval(timerInterval);
+    state.timerSec = 0;
+    onTimerEnd();
+  }
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(state.timerSec / 60);
+  const s = state.timerSec % 60;
+  document.getElementById('big-timer').textContent = m + ':' + String(s).padStart(2,'0');
+  const progress = 1 - state.timerSec / state.timerTotal;
+  const circ = 2 * Math.PI * 88;
+  document.getElementById('arc-fill').style.strokeDashoffset = circ * (1 - progress);
+
+  if (state.timerSec <= 0) {
+    document.getElementById('timer-phase').textContent = 'keep going ✓';
+  } else if (state.timerSec <= 60) {
+    document.getElementById('timer-phase').textContent = 'almost there';
+  } else {
+    document.getElementById('timer-phase').textContent = 'just begin';
+  }
+}
+
+function onTimerEnd() {
+  launchConfetti();
+  showComplete('⏱', 'Two minutes done.', 'Most people keep going from here. You can stop — or start the next step.');
+}
+
+function extendTimer() {
+  state.timerSec += 300;
+  state.timerTotal += 300;
+  document.getElementById('timer-phase').textContent = '+5 min added';
+  if (!state.timerRunning) {
+    state.timerRunning = true;
+    timerInterval = setInterval(tick, 1000);
+  }
+}
+
+function togglePause() {
+  state.paused = !state.paused;
+  document.getElementById('pause-btn').textContent = state.paused ? 'Resume' : 'Pause';
+}
+
+// ── TASK DONE ──
+function taskDone() {
+  clearInterval(timerInterval);
+  launchConfetti();
+  showComplete('🌟', 'Task complete.', '"' + state.task + '" — done. What\'s next?');
+}
+
+// ── COMPLETE OVERLAY ──
+function showComplete(em, title, sub) {
+  document.getElementById('c-em').textContent = em;
+  document.getElementById('c-title').textContent = title;
+  document.getElementById('c-sub').textContent = sub;
+  document.getElementById('complete-overlay').classList.add('show');
+}
+
+function closeComplete() {
+  document.getElementById('complete-overlay').classList.remove('show');
+  // offer next step
+  state.micro = 'Keep going — what\'s the next small step?';
+  document.getElementById('work-micro-display').textContent = state.micro;
+  document.getElementById('task-pill').textContent = state.micro;
+  startTimer(5 * 60);
+}
+
+// ── CONFETTI ──
+function launchConfetti() {
+  const canvas = document.getElementById('confetti');
+  const ctx = canvas.getContext('2d');
+  canvas.width = innerWidth; canvas.height = innerHeight;
+  const colors = ['#C4782A','#8B3A6B','#D4A0BF','#E8C48A','#3A7D6E','#2A1A0E'];
+  const pieces = Array.from({length:70}, () => ({
+    x: Math.random() * canvas.width,
+    y: -8,
+    r: Math.random() * 5 + 3,
+    vx: (Math.random() - .5) * 4,
+    vy: Math.random() * 3 + 2,
+    life: 1,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    rot: Math.random() * Math.PI * 2,
+    rspeed: (Math.random() - .5) * 0.2
+  }));
+  let f = 0;
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    pieces.forEach(p => {
+      p.x += p.vx; p.y += p.vy; p.life -= 0.011; p.rot += p.rspeed;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillRect(-p.r/2, -p.r/2, p.r, p.r * 1.6);
+      ctx.restore();
+    });
+    f++;
+    if (f < 130 && pieces.some(p => p.life > 0)) requestAnimationFrame(draw);
+    else ctx.clearRect(0,0,canvas.width,canvas.height);
+  }
+  draw();
+}
+
+// ── KEYBOARD ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && state.screen === 3) confirmTask();
+});
+
+init();
+</script>
+</body>
+</html>
